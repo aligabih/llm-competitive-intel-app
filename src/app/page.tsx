@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 const companies = [
   "Apple",
@@ -17,6 +19,7 @@ const companies = [
   "Samsung",
   "Intel",
   "IBM",
+  "Custom",
 ];
 
 const focusAreas = [
@@ -30,19 +33,22 @@ const focusAreas = [
 
 export default function HomePage() {
   const [company, setCompany] = useState(companies[0]);
+  const [customCompany, setCustomCompany] = useState("");
   const [focus, setFocus] = useState(focusAreas[0]);
   const [date, setDate] = useState("");
+  const [prompt, setPrompt] = useState("");
   const [response, setResponse] = useState("");
   const [sources, setSources] = useState<string[]>([]);
   const [confidence, setConfidence] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
+    const selectedCompany = company === "Custom" ? customCompany : company;
     setLoading(true);
     const res = await fetch("/api/scan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ company, focus, date }),
+      body: JSON.stringify({ company: selectedCompany, focus, date, prompt }),
     });
     const data = await res.json();
     setResponse(data.summary);
@@ -51,21 +57,37 @@ export default function HomePage() {
     setLoading(false);
   };
 
-  return (
-    <main className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-4xl font-semibold mb-6 text-center">
-        LLM Competitive Intelligence Analyst
-      </h1>
+  const renderSummaryWithFootnotes = () => {
+    let updated = response;
+    sources.forEach((src, i) => {
+      const footnote = `[${i + 1}]`;
+      const link = `<sup class='text-xs align-super'><a href="${src}" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline">[${
+        i + 1
+      }]</a></sup>`;
+      updated = updated.replaceAll(footnote, link);
+    });
+    return updated;
+  };
 
-      <Card className="mb-6 shadow-xl hover:shadow-2xl transition duration-300 ease-in-out">
-        <CardContent className="space-y-4 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+  return (
+    <main className="p-6 max-w-5xl mx-auto font-sans bg-gray-50 min-h-screen">
+      <header className="mb-8 py-4 border-b border-gray-300">
+        <h1 className="text-4xl font-bold text-center text-gray-800">
+          Competitive Intelligence Dashboard
+        </h1>
+      </header>
+
+      <Card className="mb-6 shadow-md bg-white">
+        <CardContent className="space-y-6 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <Label>Company</Label>
+              <Label className="block text-sm font-medium text-gray-700 mb-1">
+                Company
+              </Label>
               <select
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
-                className="w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-primary transition"
+                className="w-full border border-gray-300 p-2 rounded text-gray-700"
               >
                 <option value="All">All Companies</option>
                 {companies.map((c) => (
@@ -74,84 +96,105 @@ export default function HomePage() {
                   </option>
                 ))}
               </select>
+              {company === "Custom" && (
+                <Input
+                  placeholder="Enter custom company name"
+                  value={customCompany}
+                  onChange={(e) => setCustomCompany(e.target.value)}
+                  className="mt-2 w-full"
+                />
+              )}
             </div>
+            {company !== "Custom" && (
+              <div>
+                <Label className="block text-sm font-medium text-gray-700 mb-1">
+                  Focus Area
+                </Label>
+                <select
+                  value={focus}
+                  onChange={(e) => setFocus(e.target.value)}
+                  className="w-full border border-gray-300 p-2 rounded text-gray-700"
+                >
+                  <option value="All">Focus Areas</option>
+                  {focusAreas.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
-              <Label>Focus Area</Label>
-              <select
-                value={focus}
-                onChange={(e) => setFocus(e.target.value)}
-                className="w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-primary transition"
-              >
-                <option value="All">Focus Areas</option>
-                {focusAreas.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <Label>From Date (optional)</Label>
+              <Label className="block text-sm font-medium text-gray-700 mb-1">
+                From Date (optional)
+              </Label>
               <Input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:ring-primary transition"
+                className="w-full"
               />
             </div>
           </div>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full py-3 mt-4 rounded-lg bg-primary text-white hover:bg-primary-dark transition duration-300"
-          >
-            {loading ? "Analyzing..." : "Analyze Company"}
-          </Button>
+
+          <div>
+            <Label className="block text-sm font-medium text-gray-700 mb-1 mt-4">
+              Custom Prompt (optional)
+            </Label>
+            <Textarea
+              placeholder="Ask a question about any company or market trend..."
+              rows={4}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              className="w-full text-gray-700"
+            />
+          </div>
+
+          <div className="text-right">
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {loading ? "Analyzing..." : "Analyze Company"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       {response && (
-        <>
-          {/* Strategic Summary Section */}
-          <Card className="mb-6 shadow-xl hover:shadow-2xl transition duration-300 ease-in-out">
-            <CardContent className="p-6 space-y-4">
-              <h2 className="text-2xl font-semibold text-primary">
-                Strategic Summary:
-              </h2>
+        <Card className="shadow-md bg-white">
+          <CardContent className="p-6 space-y-4">
+            <h2 className="text-2xl font-semibold text-gray-800">
+              Strategic Summary
+            </h2>
+            <p
+              className="text-gray-700 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: renderSummaryWithFootnotes() }}
+            ></p>
+            {sources.length > 0 && (
               <div>
-                <p className="text-lg text-muted-foreground">{response}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Sources Section */}
-          {sources.length > 0 && (
-            <Card className="mb-6 shadow-xl hover:shadow-2xl transition duration-300 ease-in-out">
-              <CardContent className="p-6">
-                <h3 className="text-xl font-semibold text-primary mb-4">
-                  Sources:
+                <h3 className="text-lg font-medium mt-4 text-gray-800">
+                  Sources
                 </h3>
-                <div className="space-y-4">
+                <ol className="list-decimal pl-6 space-y-1 text-sm text-blue-600">
                   {sources.map((src, i) => (
-                    <div
-                      key={i}
-                      className="bg-gray-100 hover:bg-gray-200 rounded-lg p-4 transition duration-200 ease-in-out"
-                    >
+                    <li key={i}>
                       <a
                         href={src}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 underline"
+                        className="hover:underline"
                       >
                         {src}
                       </a>
-                    </div>
+                    </li>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
+                </ol>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </main>
   );
