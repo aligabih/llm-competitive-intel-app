@@ -37,36 +37,52 @@ export default function HomePage() {
   const [focus, setFocus] = useState(focusAreas[0]);
   const [date, setDate] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [response, setResponse] = useState("");
-  const [sources, setSources] = useState<string[]>([]);
-  const [confidence, setConfidence] = useState("");
+  const [summaryHTML, setSummaryHTML] = useState("");
+  const [confidenceHTML, setConfidenceHTML] = useState("");
+  const [sourcesHTML, setSourcesHTML] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async () => {
     const selectedCompany = company === "Custom" ? customCompany : company;
-    setLoading(true);
-    const res = await fetch("/api/scan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ company: selectedCompany, focus, date, prompt }),
-    });
-    const data = await res.json();
-    setResponse(data.summary);
-    setSources(data.sources || []);
-    setConfidence(data.confidence || "N/A");
-    setLoading(false);
-  };
 
-  const renderSummaryWithFootnotes = () => {
-    let updated = response;
-    sources.forEach((src, i) => {
-      const footnote = `[${i + 1}]`;
-      const link = `<sup class='text-xs align-super'><a href="${src}" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline">[${
-        i + 1
-      }]</a></sup>`;
-      updated = updated.replaceAll(footnote, link);
-    });
-    return updated;
+    if (!selectedCompany || !focus) {
+      setError("Please provide both a company and a focus area.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSummaryHTML("");
+    setConfidenceHTML("");
+    setSourcesHTML("");
+
+    try {
+      const res = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: selectedCompany,
+          focus,
+          date,
+          prompt,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setSummaryHTML(data.summaryHTML || "");
+        setConfidenceHTML(data.confidenceHTML || "");
+        setSourcesHTML(data.sourcesHTML || "");
+      } else {
+        setError(data.error || "An error occurred.");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -105,6 +121,7 @@ export default function HomePage() {
                 />
               )}
             </div>
+
             {company !== "Custom" && (
               <div>
                 <Label className="block text-sm font-medium text-gray-700 mb-1">
@@ -116,14 +133,15 @@ export default function HomePage() {
                   className="w-full border border-gray-300 p-2 rounded text-gray-700"
                 >
                   <option value="All">Focus Areas</option>
-                  {focusAreas.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {focusAreas.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
                     </option>
                   ))}
                 </select>
               </div>
             )}
+
             <div>
               <Label className="block text-sm font-medium text-gray-700 mb-1">
                 From Date (optional)
@@ -150,6 +168,10 @@ export default function HomePage() {
             />
           </div>
 
+          {error && (
+            <div className="text-red-600 text-sm font-medium">{error}</div>
+          )}
+
           <div className="text-right">
             <Button
               onClick={handleSubmit}
@@ -162,36 +184,17 @@ export default function HomePage() {
         </CardContent>
       </Card>
 
-      {response && (
+      {(summaryHTML || confidenceHTML || sourcesHTML) && (
         <Card className="shadow-md bg-white">
-          <CardContent className="p-6 space-y-4">
-            <h2 className="text-2xl font-semibold text-gray-800">
-              Strategic Summary
-            </h2>
-            <p
-              className="text-gray-700 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: renderSummaryWithFootnotes() }}
-            ></p>
-            {sources.length > 0 && (
-              <div>
-                <h3 className="text-lg font-medium mt-4 text-gray-800">
-                  Sources
-                </h3>
-                <ol className="list-decimal pl-6 space-y-1 text-sm text-blue-600">
-                  {sources.map((src, i) => (
-                    <li key={i}>
-                      <a
-                        href={src}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                      >
-                        {src}
-                      </a>
-                    </li>
-                  ))}
-                </ol>
-              </div>
+          <CardContent className="p-6 space-y-6">
+            {summaryHTML && (
+              <div dangerouslySetInnerHTML={{ __html: summaryHTML }} />
+            )}
+            {confidenceHTML && (
+              <div dangerouslySetInnerHTML={{ __html: confidenceHTML }} />
+            )}
+            {sourcesHTML && (
+              <div dangerouslySetInnerHTML={{ __html: sourcesHTML }} />
             )}
           </CardContent>
         </Card>
